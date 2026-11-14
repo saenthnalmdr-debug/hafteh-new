@@ -54,6 +54,14 @@ jobs:
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
           echo "Android project root: $PROJECT_DIR"
 
+      - name: Inspect current app source for requested UI updates
+        run: |
+          PROJECT_DIR="${{ steps.project.outputs.project_dir }}"
+          echo "===== MAIN ACTIVITY SOURCE ====="
+          find "$PROJECT_DIR" -type f -name '*.kt' -print
+          find "$PROJECT_DIR" -type f -name 'MainActivity.kt' -exec cat {} \;
+          echo "===== END MAIN ACTIVITY SOURCE ====="
+
       - name: Build debug APK
         run: gradle -p "${{ steps.project.outputs.project_dir }}" --no-daemon assembleDebug
 
