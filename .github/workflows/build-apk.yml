@@ -1,4 +1,3 @@
-
 name: Build Hafteh APK
 
 on:
@@ -23,7 +22,6 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
@@ -33,11 +31,34 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
-        run: gradle assembleDebug
+      - name: Extract Android project
+        id: project
+        shell: bash
+        run: |
+          mkdir -p extracted
+          unzip -q Hafteh-new-project-source.zip -d extracted
+          SETTINGS_FILE=$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: No settings.gradle or settings.gradle.kts found in the source ZIP."
+            unzip -l Hafteh-new-project-source.zip
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: Gradle settings found at $PROJECT_DIR, but app/build.gradle(.kts) is missing."
+            find extracted -maxdepth 5 -type f | sort
+            exit 1
+          fi
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Android project root: $PROJECT_DIR"
+
+      - name: Build debug APK
+        run: gradle -p "${{ steps.project.outputs.project_dir }}" --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Hafteh-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: extracted/**/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
